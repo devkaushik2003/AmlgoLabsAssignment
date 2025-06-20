@@ -1,0 +1,68 @@
+AMLGOLABS Project Report
+=======================
+
+1. Document Structure and Chunking Logic
+----------------------------------------
+- The system processes documents in PDF, DOCX, or TXT format, located in the `data/` directory.
+- Text is extracted using PyPDF2 (for PDF) or python-docx (for DOCX), then cleaned to remove extra spaces and unwanted characters.
+- Chunking is performed using NLTK's sentence tokenizer, splitting the text into chunks of 100–300 words, always ending at sentence boundaries for coherence.
+- Each chunk is saved as a JSON object with an ID and text in `chunks/chunks.jsonl`.
+
+2. Embedding Model and Vector DB Used
+-------------------------------------
+- Embeddings are generated using the `all-MiniLM-L6-v2` model from the SentenceTransformers library.
+- All chunks are encoded into dense vectors.
+- The FAISS library is used to build a vector database (index) for fast similarity search.
+- The FAISS index and chunk mapping are stored in the `vectordb/` directory as `faiss.index` and `chunk_mapping.json`.
+
+3. Prompt Format and Generation Logic
+-------------------------------------
+- When a user submits a query, it is embedded using the same embedding model.
+- The top-k (default: 3) most relevant chunks are retrieved from the FAISS index.
+- A prompt is constructed for the Gemini LLM in the following format:
+
+  "You are an AI assistant. Use ONLY the following sources to answer the user's question.\n\n[Source 1: ...]\n[Source 2: ...]\n...\nUser question: [query]\n\nAnswer (cite sources as Source 1, Source 2, etc. if used):"
+
+- The Gemini 2.0 Flash model (via Google Generative AI API) generates the answer, which is returned to the user along with the retrieved sources.
+
+4. Example Queries and Responses
+-------------------------------
+**Example 1 (Success):**
+Q: What is the process for resolving disputes on eBay?
+A: [Model returns a summary of the dispute resolution process, citing relevant sources.]
+
+**Example 2 (Success):**
+Q: Who is responsible for product recalls on eBay?
+A: [Model identifies the seller's responsibility, citing the correct chunk.]
+
+**Example 3 (Partial/Failure):**
+Q: What is eBay's policy on cryptocurrency payments?
+A: [Model may not find relevant information if the document does not mention cryptocurrency, and will either say so or hallucinate.]
+
+**Example 4 (Success):**
+Q: How does eBay handle user privacy?
+A: [Model summarizes privacy policy, referencing the correct section.]
+
+**Example 5 (Failure):**
+Q: What is the weather like in San Jose?
+A: [Model should respond that the document does not contain this information, but may hallucinate if not properly constrained.]
+
+5. Notes on Hallucinations, Model Limitations, and Slow Responses
+-----------------------------------------------------------------
+- The Gemini LLM may hallucinate or fabricate information if the prompt or retrieved context is insufficient or ambiguous.
+- If the document does not contain the answer, the model may still attempt to answer, so users should verify with the cited sources.
+- The system is limited by the quality and coverage of the input document; missing topics cannot be answered reliably.
+- Slow responses may occur due to network latency with the Gemini API or large document size affecting retrieval speed.
+- The chunking logic ensures context is coherent, but very large or very small chunks may affect retrieval accuracy.
+
+6. System Dependencies
+---------------------
+- Python libraries: streamlit, faiss-cpu, sentence-transformers, google-generativeai, nltk, PyPDF2, pandas, python-dotenv, requests
+- Data files: Place your document in the `data/` directory as PDF, DOCX, or TXT.
+- Chunks and vector DB are stored in `chunks/` and `vectordb/` respectively.
+
+7. Usage
+--------
+- Run the Streamlit app (`app.py`) to interact with the chatbot.
+- Enter your Gemini API key when prompted.
+- Ask questions about the uploaded document and review the cited sources for each answer. 
